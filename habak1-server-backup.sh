@@ -5,6 +5,7 @@ set -euo pipefail
 ACTION=$1
 
 if [ "${ACTION}" == "prepare" ]; then
+  echo Preparing backup...
   if [ "$(hostname)" != "habak1" ]; then
     echo "backup prepare script should only be run on habak1 server."
     exit 1
@@ -25,4 +26,6 @@ if [ "${ACTION}" == "prepare" ]; then
   cd ..
   tar -czf habak1-backup.tar.gz backup
   rm -rf backup
+  ls -lah /tmp/habak1-backup.tar.gz
+  echo "Backup prepared successfully."
 fi
