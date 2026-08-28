@@ -46,3 +46,52 @@ EOF
 sudo apt update
 sudo apt install -y docker-ce docker-ce-cli containerd.io docker-buildx-plugin docker-compose-plugin
 ```
+
+Give your user access to Docker:
+
+```
+sudo usermod -aG docker $USER
+```
+
+Relogin to the server for the group change to take effect.
+
+Generate ssh keys for each repo:
+
+```
+ssh-keygen -t ed25519 -f ~/.ssh/id_ed25519_burn_talkies
+ssh-keygen -t ed25519 -f ~/.ssh/id_ed25519_ops_log
+ssh-keygen -t ed25519 -f ~/.ssh/id_ed25519_habak_infra
+```
+
+Add each public key to the relevant GitHub repo as a deploy key with read/write access.
+
+Setup ssh config for each repo:
+
+```
+cat <<EOF >> ~/.ssh/config
+Host github.com-burn-talkies
+    HostName github.com
+    User git
+    IdentityFile ~/.ssh/id_ed25519_burn_talkies
+
+Host github.com-ops-log
+    HostName github.com
+    User git
+    IdentityFile ~/.ssh/id_ed25519_ops_log
+
+Host github.com-habak-infra
+    HostName github.com
+    User git
+    IdentityFile ~/.ssh/id_ed25519_habak_infra
+EOF
+```
+
+Clone the repositories:
+
+```
+cd
+git clone ssh://github.com-burn-talkies/habak-tech/burn-talkies.git
+git clone ssh://github.com-ops-log/habak-tech/midburn-ops-log.git
+git clone ssh://github.com-habak-infra/habak-tech/midburn-habak-infra.git
+```
+

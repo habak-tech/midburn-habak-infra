@@ -1,0 +1,15 @@
+users:
+  admin:
+    #displayname: Admin
+    password: "$argon2id$HASH"
+    #email: admin@habak.midburn
+    groups:
+      - admins
+      - users
+
+  sahbak:
+    #displayname: Sahbak
+    password: "$argon2id$HASH"
+    #email: user@habak.midburn
+    groups:
+      - users

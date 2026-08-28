@@ -1,0 +1,5 @@
+auth-proxy/authelia/users.yml
+auth-proxy/authelia/secrets
+auth-proxy/authelia/db.sqlite3
+auth-proxy/authelia/notification.txt
+
