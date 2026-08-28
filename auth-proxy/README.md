@@ -40,13 +40,24 @@ cp .env.example .env
 # modify for production - replace the secrets
 ```
 
+setup habak ai
+
+```
+cd ../midburn-habak-ai/Habak\ AI\ Agent/
+cp .env.production.example .env
+# modify for production
+```
+
 ## Running
 
 ```
 cd ../midburn-ops-log
-docker compose -f compose.yaml -f compose.prod.yaml up -d
+docker compose up -d
 
 cd ../burn-talkies
+docker compose up -d
+
+cd ../midburn-habak-ai/Habak\ AI\ Agent/
 docker compose up -d
 
 cd ../midburn-habak-infra/auth-proxy

@@ -61,6 +61,7 @@ Generate ssh keys for each repo:
 ssh-keygen -t ed25519 -f ~/.ssh/id_ed25519_burn_talkies
 ssh-keygen -t ed25519 -f ~/.ssh/id_ed25519_ops_log
 ssh-keygen -t ed25519 -f ~/.ssh/id_ed25519_habak_infra
+ssh-keygen -t ed25519 -f ~/.ssh/id_ed25519_habak_ai
 ```
 
 Add each public key to the relevant GitHub repo as a deploy key with read/write access.
@@ -83,6 +84,11 @@ Host github.com-habak-infra
     HostName github.com
     User git
     IdentityFile ~/.ssh/id_ed25519_habak_infra
+
+Host github.com-habak-ai
+    HostName github.com
+    User git
+    IdentityFile ~/.ssh/id_ed25519_habak_ai
 EOF
 ```
 
@@ -93,6 +99,7 @@ cd
 git clone ssh://github.com-burn-talkies/habak-tech/burn-talkies.git
 git clone ssh://github.com-ops-log/habak-tech/midburn-ops-log.git
 git clone ssh://github.com-habak-infra/habak-tech/midburn-habak-infra.git
+git clone ssh://github.com-habak-ai/habak-tech/midburn-habak-ai.git
 ```
 
 see auth-proxy/README.md for setup of the auth proxy and related repos
