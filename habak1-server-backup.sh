@@ -14,7 +14,7 @@ if [ "${ACTION}" == "prepare" ]; then
     exit 1
   fi
   cd /tmp
-  rm -rf backup
+  rm -rf backup habak1-backup.tar.gz
   mkdir backup
   cd backup
   tar -czf home.tar.gz /home/habak/* /home/habak/.ssh
