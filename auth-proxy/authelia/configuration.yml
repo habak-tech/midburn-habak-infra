@@ -34,6 +34,9 @@ access_control:
       policy: one_factor
 
 session:
+  expiration: 1M
+  inactivity: 1M
+  remember_me: 1M
   cookies:
     - domain: '{{ env "COOKIE_DOMAIN" }}'
       authelia_url: '{{ env "AUTH_PORTAL_URL" }}'
