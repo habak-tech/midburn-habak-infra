@@ -95,11 +95,10 @@ Treat the tunnel token as a secret; `.env` is excluded from Git. Users with
 access to the Docker daemon can inspect container environment variables and
 therefore access the token.
 
-Start the proxy with the tunnel:
+Add to .env:
 
-```sh
-docker compose --profile cloudflare up -d
+```
+COMPOSE_PROFILES=cloudflare
 ```
 
-Without the profile, `docker compose up -d` continues to run only Traefik and
-Authelia.
+Start the proxy normally
