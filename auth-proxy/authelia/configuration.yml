@@ -25,9 +25,9 @@ authentication_backend:
 access_control:
   default_policy: deny
   rules:
-    - domain: auth.habak.midburn
+    - domain: '{{ env "AUTH_HOSTNAME" }}'
       policy: bypass
-    - domain: ops.habak.midburn
+    - domain: '{{ env "APP_HOSTNAME" }}'
       subject:
         - "group:midburn-ops-user"
         - "group:midburn-ops-admin"
@@ -35,8 +35,8 @@ access_control:
 
 session:
   cookies:
-    - domain: habak.midburn
-      authelia_url: https://auth.habak.midburn:8543
+    - domain: '{{ env "COOKIE_DOMAIN" }}'
+      authelia_url: '{{ env "AUTH_PORTAL_URL" }}'
       # default_redirection_url: https://app.habak.midburn:8543
 
 storage:

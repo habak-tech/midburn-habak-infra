@@ -95,3 +95,4 @@ git clone ssh://github.com-ops-log/habak-tech/midburn-ops-log.git
 git clone ssh://github.com-habak-infra/habak-tech/midburn-habak-infra.git
 ```
 
+see auth-proxy/README.md for setup of the auth proxy and related repos

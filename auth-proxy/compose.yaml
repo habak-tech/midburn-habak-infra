@@ -29,6 +29,11 @@ services:
       - ./authelia/secrets:/secrets:ro
     environment:
       TZ: Asia/Jerusalem
+      X_AUTHELIA_CONFIG_FILTERS: template
+      AUTH_HOSTNAME: ${AUTH_HOSTNAME:-auth.habak.midburn}
+      APP_HOSTNAME: ${APP_HOSTNAME:-ops.habak.midburn}
+      COOKIE_DOMAIN: ${COOKIE_DOMAIN:-habak.midburn}
+      AUTH_PORTAL_URL: ${AUTH_PORTAL_URL:-https://auth.habak.midburn:8543}
       AUTHELIA_IDENTITY_VALIDATION_RESET_PASSWORD_JWT_SECRET_FILE: /secrets/JWT_SECRET
       AUTHELIA_SESSION_SECRET_FILE: /secrets/SESSION_SECRET
       AUTHELIA_STORAGE_ENCRYPTION_KEY_FILE: /secrets/STORAGE_ENCRYPTION_KEY
@@ -36,10 +41,26 @@ services:
       - authproxy
     labels:
       - traefik.enable=true
-      - traefik.http.routers.authelia.rule=Host(`auth.habak.midburn`)
+      - traefik.http.routers.authelia.rule=Host(`${AUTH_HOSTNAME:-auth.habak.midburn}`)
       - traefik.http.routers.authelia.entrypoints=websecure
       - traefik.http.routers.authelia.tls=true
       - traefik.http.services.authelia.loadbalancer.server.port=9091
+
+  cloudflared:
+    image: cloudflare/cloudflared:2026.8.2
+    restart: unless-stopped
+    profiles:
+      - cloudflare
+    command:
+      - tunnel
+      - --no-autoupdate
+      - run
+    environment:
+      TUNNEL_TOKEN: ${CLOUDFLARE_TUNNEL_TOKEN:-}
+    depends_on:
+      - traefik
+    networks:
+      - authproxy
 
 networks:
   authproxy:
