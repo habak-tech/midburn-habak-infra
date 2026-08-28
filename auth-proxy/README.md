@@ -11,7 +11,7 @@ Copy .env.example to .env and edit the values as needed.
 Set in /etc/hosts - on the server with 127.0.0.1 and on local machines with the server IP:
 
 ```
-127.0.0.1 auth.habak.midburn ops.habak.midburn
+127.0.0.1 auth.habak.midburn ops.habak.midburn ai.habak.midburn talkies.habak.midburn
 ```
 
 Setup shared network:
@@ -32,11 +32,22 @@ POSTGRES_IMAGE=ghcr.io/habak-tech/midburn-ops-log-postgres:latest
 " >> .env
 ```
 
+Setup burn talkies
+
+```
+cd ../burn-talkies
+cp .env.example .env
+# modify for production - replace the secrets
+```
+
 ## Running
 
 ```
 cd ../midburn-ops-log
 docker compose -f compose.yaml -f compose.prod.yaml up -d
+
+cd ../burn-talkies
+docker compose up -d
 
 cd ../midburn-habak-infra/auth-proxy
 docker compose up -d
