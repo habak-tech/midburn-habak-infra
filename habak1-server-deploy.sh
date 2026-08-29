@@ -18,7 +18,7 @@ for proj in $PROJS; do
   echo Pulling $proj
   cd /home/habak/$proj
   if [ "${proj}" == "midburn-habak-ai" ]; then
-    cd "Habak\ AI\ Agent"
+    cd "Habak AI Agent"
   fi
   git pull origin main
   docker compose pull
