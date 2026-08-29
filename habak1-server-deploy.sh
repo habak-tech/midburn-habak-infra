@@ -7,7 +7,7 @@ if [ "$(hostname)" != "habak1" ]; then
   exit 1
 fi
 
-if [ "${USER}" == "habak" ]; then
+if [ "${USER}" != "habak" ]; then
   echo "deploy script should be run as habak user"
   exit 1
 fi
