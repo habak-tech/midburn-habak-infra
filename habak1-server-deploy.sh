@@ -12,11 +12,14 @@ if [ "${USER}" != "habak" ]; then
   exit 1
 fi
 
-PROJS="burn-talkies midburn-habak-ai/Habak\ AI\ Agent midburn-ops-log"
+PROJS="burn-talkies midburn-habak-ai midburn-ops-log"
 
 for proj in $PROJS; do
   echo Pulling $proj
   cd /home/habak/$proj
+  if [ "${proj}" == "midburn-habak-ai" ]; then
+    cd "Habak\ AI\ Agent"
+  fi
   git pull origin main
   docker compose pull
 done
@@ -24,6 +27,9 @@ done
 for proj in $PROJS; do
   echo Deploying $proj
   cd /home/habak/$proj
+  if [ "${proj}" == "midburn-habak-ai" ]; then
+    cd "Habak\ AI\ Agent"
+  fi
   docker compose up -d --remove-orphans --wait
 done
 
