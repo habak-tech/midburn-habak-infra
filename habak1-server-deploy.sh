@@ -28,7 +28,7 @@ for proj in $PROJS; do
   echo Deploying $proj
   cd /home/habak/$proj
   if [ "${proj}" == "midburn-habak-ai" ]; then
-    cd "Habak\ AI\ Agent"
+    cd "Habak AI Agent"
   fi
   docker compose up -d --remove-orphans --wait
 done
