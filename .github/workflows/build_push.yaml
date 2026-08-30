@@ -28,10 +28,10 @@ permissions:
   packages: write
 
 env:
-  IMAGE: ghcr.io/habak-tech/${{ github.event.inputs.image_name }}-${{ github.event.inputs.image_suffix }}
+  IMAGE: ghcr.io/habak-tech/${{ inputs.image_name }}-${{ inputs.image_suffix }}
 
 concurrency:
-  group: ${{ github.event.inputs.image_suffix }}-${{ github.ref }}
+  group: ${{ inputs.image_suffix }}-${{ github.ref }}
   cancel-in-progress: true
 
 jobs:
@@ -43,12 +43,12 @@ jobs:
         include:
           - platform: linux/amd64
             runner: ubuntu-24.04
-            cache-scope: ${{ github.event.inputs.image_suffix }}-linux-amd64
-            artifact: ${{ github.event.inputs.image_suffix }}-linux-amd64
+            cache-scope: ${{ inputs.image_suffix }}-linux-amd64
+            artifact: ${{ inputs.image_suffix }}-linux-amd64
           - platform: linux/arm64
             runner: ubuntu-24.04-arm
-            cache-scope: ${{ github.event.inputs.image_suffix }}-linux-arm64
-            artifact: ${{ github.event.inputs.image_suffix }}-linux-arm64
+            cache-scope: ${{ inputs.image_suffix }}-linux-arm64
+            artifact: ${{ inputs.image_suffix }}-linux-arm64
     runs-on: ${{ matrix.runner }}
     steps:
       - uses: actions/checkout@v4
@@ -61,9 +61,9 @@ jobs:
       - id: build
         uses: docker/build-push-action@v6
         with:
-          context: ${{ github.event.inputs.docker_context }}
-          file: ${{ github.event.inputs.docker_file }}
-          target: ${{ github.event.inputs.docker_target }}
+          context: ${{ inputs.docker_context }}
+          file: ${{ inputs.docker_file }}
+          target: ${{ inputs.docker_target }}
           platforms: ${{ matrix.platform }}
           outputs: type=image,name=${{ env.IMAGE }},push-by-digest=true,name-canonical=true,push=true
           cache-from: type=gha,scope=${{ matrix.cache-scope }}
@@ -87,7 +87,7 @@ jobs:
     steps:
       - uses: actions/download-artifact@v4
         with:
-          pattern: ${{ github.event.inputs.image_suffix }}-linux-*
+          pattern: ${{ inputs.image_suffix }}-linux-*
           path: /tmp/digests
           merge-multiple: true
       - uses: docker/login-action@v3
