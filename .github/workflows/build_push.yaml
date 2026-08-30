@@ -17,7 +17,7 @@ on:
       docker_file:
         required: false
         type: string
-        default: "Dockerfile"
+        default: ""
       docker_target:
         required: false
         type: string
