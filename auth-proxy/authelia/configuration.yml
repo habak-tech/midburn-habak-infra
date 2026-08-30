@@ -26,6 +26,14 @@ access_control:
   rules:
     - domain: '{{ env "AUTH_HOSTNAME" }}'
       policy: bypass
+    - domain: "*.{{ env "COOKIE_DOMAIN" }}"
+      policy: bypass
+      resources:
+        - '^/_next/static/.*$'
+    - domain: "*.{{ env "COOKIE_DOMAIN" }}"
+      policy: bypass
+      methods:
+        - OPTIONS
     - domain: '*.{{ env "COOKIE_DOMAIN" }}'
       subject:
         - "group:midburn-ops-user"
