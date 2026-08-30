@@ -38,6 +38,6 @@ cd /home/habak/midburn-habak-infra/auth-proxy
 docker compose restart
 
 echo cleaning up...
-docker system prune -f
+docker system prune -f --all
 
 echo Great Success! All projects deployed successfully.
