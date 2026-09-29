@@ -138,6 +138,8 @@ cat <<EOF | sudo tee /etc/cron.d/habak-backup
 * * * * * habak /home/habak/midburn-habak-infra/habak1-server-backup.sh copy
 * * * * * habak /home/habak/midburn-habak-infra/habak1-server-backup.sh upload
 EOF
+sudo systemctl restart cron
+sudo journalctl -u cron -f
 ```
 
 ## Deploy

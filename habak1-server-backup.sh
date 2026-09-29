@@ -19,7 +19,7 @@ if [ "${ACTION}" == "prepare" ]; then
     exit 1
   fi
   cd /tmp
-  rm -rf backup habak1-backup.tar.gz
+  rm -rf backup habak1-backup-new.tar.gz
   mkdir backup
   cd backup
   tar -czf home.tar.gz /home/habak/* /home/habak/.ssh
@@ -28,9 +28,10 @@ if [ "${ACTION}" == "prepare" ]; then
   docker exec midburn-ops-log-db-1 pg_dumpall -U midburn_ops_log | gzip > midburn-ops-log-db.sql.gz
   tar -czf ai-uploads.tar.gz "$(docker volume inspect habak-ai_uploads --format '{{ .Mountpoint }}')"
   cd ..
-  tar -czf habak1-backup.tar.gz backup
+  tar -czf habak1-backup-new.tar.gz backup
   rm -rf backup
-  ls -lah /tmp/habak1-backup.tar.gz
+  ls -lah /tmp/habak1-backup-new.tar.gz
+  mv -f /tmp/habak1-backup-new.tar.gz /tmp/habak1-backup.tar.gz
   echo "Backup saved to /tmp/habak1-backup.tar.gz"
 elif [ "${USER}" != "habak" ]; then
   echo "backup actions except prepare should be run as habak user"
