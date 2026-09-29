@@ -134,9 +134,7 @@ Setup backup cronjobs
 
 ```
 cat <<EOF | sudo tee /etc/cron.d/habak-backup
-* * * * * root /home/habak/midburn-habak-infra/habak1-server-backup.sh prepare
-* * * * * habak /home/habak/midburn-habak-infra/habak1-server-backup.sh copy
-* * * * * habak /home/habak/midburn-habak-infra/habak1-server-backup.sh upload
+* * * * * root /home/habak/midburn-habak-infra/habak1-server-backup.sh cron
 EOF
 sudo systemctl restart cron
 sudo journalctl -u cron -f
