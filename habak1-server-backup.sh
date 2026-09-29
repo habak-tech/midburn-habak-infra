@@ -51,6 +51,8 @@ elif [ "${ACTION}" == "copy" ]; then
       echo "Backup copy failed: checksum mismatch"
       exit 1
     fi
+    cp -f /mnt/backup/habak1-backup.tar.gz /mnt/backup/habak1-backup-old.tar.gz
+    sync
     mv -f /mnt/backup/habak1-backup-new.tar.gz /mnt/backup/habak1-backup.tar.gz
     sync
     echo "Backup copied to /mnt/backup/habak1-backup.tar.gz"
