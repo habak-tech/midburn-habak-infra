@@ -109,7 +109,7 @@ Setup backup USB disk, the USB disk is connected to the Raspberry Pi USB port
 ```
 sudo mkdir -p /mnt/backup
 cat <<EOF | sudo tee -a /etc/fstab
-UUID=27FD-DC76  /mnt/backup  vfat  defaults,nofail,x-systemd.device-timeout=15s  0  2
+UUID=27FD-DC76  /mnt/backup  vfat  defaults,nofail,x-systemd.device-timeout=15s,uid=1000,gid=1000  0  2
 EOF
 sudo systemctl daemon-reload
 sudo mount -a

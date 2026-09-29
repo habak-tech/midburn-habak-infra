@@ -4,12 +4,13 @@ set -euo pipefail
 
 ACTION=$1
 
+if [ "$(hostname)" != "habak1" ]; then
+  echo "backup script should only be run on habak1 server."
+  exit 1
+fi
+
 if [ "${ACTION}" == "prepare" ]; then
   echo Preparing backup...
-  if [ "$(hostname)" != "habak1" ]; then
-    echo "backup prepare script should only be run on habak1 server."
-    exit 1
-  fi
   if [ "$(id -u)" -ne 0 ]; then
     echo "backup prepare script should be run as root."
     exit 1
@@ -28,6 +29,9 @@ if [ "${ACTION}" == "prepare" ]; then
   rm -rf backup
   ls -lah /tmp/habak1-backup.tar.gz
   echo "Backup saved to /tmp/habak1-backup.tar.gz"
+elif [ "${USER}" != "habak" ]; then
+  echo "backup actions except prepare should be run as habak user"
+  exit 1
 elif [ "${ACTION}" == "copy" ]; then
   cp -f /tmp/habak1-backup.tar.gz /mnt/backup/habak1-backup.tar.gz
   sync
