@@ -103,3 +103,37 @@ git clone ssh://github.com-habak-ai/habak-tech/midburn-habak-ai.git
 ```
 
 see auth-proxy/README.md for setup of the auth proxy and related repos
+
+Setup backup USB disk, the USB disk is connected to the Raspberry Pi USB port
+
+```
+sudo mkdir -p /mnt/backup
+cat <<EOF | sudo tee -a /etc/fstab
+UUID=27FD-DC76  /mnt/backup  vfat  defaults,nofail,x-systemd.device-timeout=15s  0  2
+EOF
+sudo systemctl daemon-reload
+sudo mount -a
+```
+
+Setup gcloud CLI
+
+```
+wget https://dl.google.com/dl/cloudsdk/channels/rapid/downloads/google-cloud-cli-linux-arm.tar.gz
+tar -xf google-cloud-cli-linux-arm.tar.gz
+./google-cloud-sdk/install.sh
+rm google-cloud-cli-linux-arm.tar.gz
+```
+
+Create a service account key json for the midburn-habak1-server service account, and copy it to the server at ~/.gcloud-service-account.json
+
+```
+gcloud auth activate-service-account --key-file ~/.gcloud-service-account.json
+```
+
+## Deploy
+
+Push changes to github, wait for the CI/CD pipeline to complete, then run deploy script on the habak1 server:
+
+```
+midburn-habak-infra/habak1-server-deploy.sh
+```
