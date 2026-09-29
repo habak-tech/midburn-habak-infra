@@ -18,7 +18,7 @@ if [ "${ACTION}" == "cron" ]; then
     exit 1
   fi
   /home/habak/midburn-habak-infra/habak1-server-backup.sh prepare
-  sudo -u habak bash -ic "cd && . .bashrc && ./habak1-server-backup.sh copy && ./habak1-server-backup.sh upload"
+  sudo -u habak bash -ic "cd && . .bashrc && cd midburn-habak-infra && ./habak1-server-backup.sh copy && ./habak1-server-backup.sh upload"
 elif [ "${ACTION}" == "prepare" ]; then
   echo Preparing backup...
   if [ "$(id -u)" -ne 0 ]; then
