@@ -130,6 +130,16 @@ Create a service account key json for the midburn-habak1-server service account,
 gcloud auth activate-service-account --key-file ~/.gcloud-service-account.json
 ```
 
+Setup backup cronjobs
+
+```
+cat <<EOF | sudo tee /etc/cron.d/habak-backup
+* * * * * root /home/habak/midburn-habak-infra/habak1-server-backup.sh prepare
+* * * * * habak /home/habak/midburn-habak-infra/habak1-server-backup.sh copy
+* * * * * habak /home/habak/midburn-habak-infra/habak1-server-backup.sh upload
+EOF
+```
+
 ## Deploy
 
 Push changes to github, wait for the CI/CD pipeline to complete, then run deploy script on the habak1 server:

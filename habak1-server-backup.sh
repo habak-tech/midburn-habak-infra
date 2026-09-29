@@ -9,6 +9,9 @@ if [ "$(hostname)" != "habak1" ]; then
   exit 1
 fi
 
+exec 9>/home/habak/.habak1-server-backup-${ACTION}.lock
+flock -n 9 || exit 0
+
 if [ "${ACTION}" == "prepare" ]; then
   echo Preparing backup...
   if [ "$(id -u)" -ne 0 ]; then
