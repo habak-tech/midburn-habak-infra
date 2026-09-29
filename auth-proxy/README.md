@@ -4,7 +4,7 @@
 
 See authelia/secrets.md for instructions on generating secrets.
 
-Copy users.yml.example to users.yml
+Copy users.yml.example to users.yml, generate password hash using `docker run -it --entrypoint authelia authelia/authelia crypto hash generate`
 
 Copy .env.example to .env and edit the values as needed.
 
