@@ -33,13 +33,15 @@ elif [ "${USER}" != "habak" ]; then
   echo "backup actions except prepare should be run as habak user"
   exit 1
 elif [ "${ACTION}" == "copy" ]; then
-  cp -f /tmp/habak1-backup.tar.gz /mnt/backup/habak1-backup.tar.gz
-  sync
   if [ "$(sha256sum /tmp/habak1-backup.tar.gz | awk '{print $1}')" != "$(sha256sum /mnt/backup/habak1-backup.tar.gz | awk '{print $1}')" ]; then
-    echo "Backup copy failed: checksum mismatch"
-    exit 1
+    cp -f /tmp/habak1-backup.tar.gz /mnt/backup/habak1-backup.tar.gz
+    sync
+    if [ "$(sha256sum /tmp/habak1-backup.tar.gz | awk '{print $1}')" != "$(sha256sum /mnt/backup/habak1-backup.tar.gz | awk '{print $1}')" ]; then
+      echo "Backup copy failed: checksum mismatch"
+      exit 1
+    fi
+    echo "Backup copied to /mnt/backup/habak1-backup.tar.gz"
   fi
-  echo "Backup copied to /mnt/backup/habak1-backup.tar.gz"
 elif [ "${ACTION}" == "upload" ]; then
   LOCAL_HASH=$(gcloud storage hash --format='value(crc32c_hash)' /tmp/habak1-backup.tar.gz)
   REMOTE_HASH=$(gcloud storage hash --format='value(crc32c_hash)' gs://midburn-habak1-server-backups/latest.tar.gz)
