@@ -12,7 +12,15 @@ fi
 exec 9>/home/habak/.habak1-server-backup-${ACTION}.lock
 flock -n 9 || exit 0
 
-if [ "${ACTION}" == "prepare" ]; then
+if [ "${ACTION}" == "cron" ]; then
+  if [ "$(id -u)" -ne 0 ]; then
+    echo "backup cron script should be run as root."
+    exit 1
+  fi
+  /home/habak/midburn-habak-infra/habak1-server-backup.sh prepare
+  sudo -u habak /home/habak/midburn-habak-infra/habak1-server-backup.sh copy
+  sudo -u habak /home/habak/midburn-habak-infra/habak1-server-backup.sh upload
+elif [ "${ACTION}" == "prepare" ]; then
   echo Preparing backup...
   if [ "$(id -u)" -ne 0 ]; then
     echo "backup prepare script should be run as root."
