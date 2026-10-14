@@ -1,5 +1,5 @@
 server:
-  address: tcp://0.0.0.0:9091
+  address: 'tcp://0.0.0.0:9091/auth'
   endpoints:
     authz:
       forward-auth:
@@ -26,6 +26,8 @@ access_control:
   rules:
     - domain: '{{ env "AUTH_HOSTNAME" }}'
       policy: bypass
+      resources:
+        - '^/auth(/.*)?$'
     - domain: "*.{{ env "COOKIE_DOMAIN" }}"
       policy: bypass
       resources:
@@ -34,7 +36,9 @@ access_control:
       policy: bypass
       methods:
         - OPTIONS
-    - domain: '*.{{ env "COOKIE_DOMAIN" }}'
+    - domain:
+        - '{{ env "COOKIE_DOMAIN" }}'
+        - '*.{{ env "COOKIE_DOMAIN" }}'
       subject:
         - "group:midburn-ops-user"
         - "group:midburn-ops-admin"

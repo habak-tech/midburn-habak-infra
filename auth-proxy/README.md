@@ -113,3 +113,85 @@ COMPOSE_PROFILES=cloudflare
 ```
 
 Start the proxy normally
+
+## Shared IP / path routing
+
+Path mode serves all three apps and the login portal from one
+HTTPS origin, without DNS or `/etc/hosts` entries:
+
+| Component | Example URL |
+| --- | --- |
+| Operations log | `https://192.0.2.10:8543/ops/` |
+| Burn Talkies | `https://192.0.2.10:8543/talkies/` |
+| Habak AI | `https://192.0.2.10:8543/ai/` |
+| Authelia login | `https://192.0.2.10:8543/auth/` |
+
+Replace `192.0.2.10` with the server IP. In this directory's `.env`, keep the
+existing port and secret configuration and add:
+
+```env
+PUBLIC_HOST=192.0.2.10
+```
+
+The override sets Authelia's public host and cookie scope to `PUBLIC_HOST`, its
+server path to `/auth`, and its portal URL to
+`https://PUBLIC_HOST:HTTPS_PORT/auth`. The portal bypass rule applies only to
+`/auth` and its descendants; protected apps on the same IP still require a
+user in `midburn-ops-user` or `midburn-ops-admin`. HTTPS is required for the
+session cookie. Use a certificate trusted by your clients with an IP SAN for
+this IP; Traefik's default self-signed certificate is suitable only for manual
+testing after accepting the browser certificate prompt.
+
+Create the shared network if it does not already exist, then start the proxy:
+
+```sh
+docker network inspect midburn-habak-auth-proxy >/dev/null 2>&1 || \
+  docker network create midburn-habak-auth-proxy
+docker compose up -d --wait
+```
+
+From each application directory, build `web` (Talkies) or `app` (Ops/AI), then
+run `docker compose up -d --wait`. Keep existing database and migration images;
+only the application browser bundles require prefix-specific builds. The Ops
+production override still uses its configured PostgreSQL image.
+
+Traefik routes match the exact IP/host and either the prefix itself or the
+prefix followed by `/`; `/ops-other` cannot match `/ops`. Authentication runs
+before prefix stripping for Ops and Talkies. AI and Authelia receive the
+original prefixed URL and serve their own subpaths. Container health checks
+remain internal, with the AI check explicitly using its Next.js base path.
+
+For cross-app navigation, configure link destinations explicitly. In Ops use
+`AI_URL=https://192.0.2.10:8543/ai/embed` and
+`LOGOUT_URL=https://192.0.2.10:8543/auth/logout`; keep the same port as the proxy.
+
+Smoke-check login, a deep-link reload, browser assets, API calls, Talkies SSE,
+and the Ops AI iframe on the target host. To return to domain/root-path mode,
+remove `compose.path.yaml` from `COMPOSE_FILE`, clear `APP_BASE_PATH`, select the
+normal image tags, and rebuild any locally built root-path application images.
+
+### Validate changes locally
+
+From `midburn-habak-infra`, validate merged Compose configuration without
+starting the production stacks:
+
+```sh
+python3 tests/test_path_routing.py
+```
+
+After installing each app's dependencies and building Talkies with
+`APP_BASE_PATH=/talkies`, Ops with `APP_BASE_PATH=/ops`, and AI with
+`APP_BASE_PATH=/ai` (plus its documented build database URL), run:
+
+```sh
+python3 tests/path_runtime_smoke.py
+```
+
+The smoke script uses temporary loopback ports and stops all its application
+processes. It checks prefixed pages, JS/CSS assets, Vite deep links, and AI
+anonymous/admin authorization boundaries and redirects. It does not contact
+model providers or use a real database, and does not replace target-host
+login/API/SSE acceptance checks.
+
+The prefix build requirement follows [Next.js basePath behavior](https://nextjs.org/docs/pages/api-reference/config/next-config-js/basePath).
+Authelia's portal subpath uses its [server address setting](https://www.authelia.com/configuration/miscellaneous/server/).
