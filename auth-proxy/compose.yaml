@@ -32,7 +32,7 @@ services:
       X_AUTHELIA_CONFIG_FILTERS: template
       AUTH_PATH: /auth
       AUTH_HOSTNAME: ${PUBLIC_HOST:?Set PUBLIC_HOST to the server IP or shared hostname}
-#      APP_HOSTNAME: ${APP_HOSTNAME:-ops.habak.midburn}
+      AUTH_IP: ${PUBLIC_IP:-}
       COOKIE_DOMAIN: ${PUBLIC_HOST}
       AUTH_PORTAL_URL: https://${PUBLIC_HOST}:${HTTPS_PORT:-8543}/auth
       AUTHELIA_IDENTITY_VALIDATION_RESET_PASSWORD_JWT_SECRET_FILE: /secrets/JWT_SECRET
@@ -42,7 +42,7 @@ services:
       - authproxy
     labels:
       - traefik.enable=true
-      - traefik.http.routers.authelia.rule=Host(`${PUBLIC_HOST}`) && (Path(`/auth`) || PathPrefix(`/auth/`))
+      - traefik.http.routers.authelia.rule=(Host(`${PUBLIC_HOST}`) || Host(`${PUBLIC_IP}`)) && (Path(`/auth`) || PathPrefix(`/auth/`))
       - traefik.http.routers.authelia.entrypoints=websecure
       - traefik.http.routers.authelia.tls=true
       - traefik.http.services.authelia.loadbalancer.server.port=9091
