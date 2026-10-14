@@ -58,6 +58,8 @@ session:
   cookies:
     - domain: '{{ env "COOKIE_DOMAIN" }}'
       authelia_url: '{{ env "AUTH_PORTAL_URL" }}'
+    - domain: '{{ env "AUTH_IP" }}'
+      authelia_url: 'https://{{ env "AUTH_IP" }}/auth'
 
 storage:
   local:
