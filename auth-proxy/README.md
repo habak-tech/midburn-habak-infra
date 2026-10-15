@@ -9,7 +9,15 @@ All applications share one HTTPS origin and fixed paths:
 | Habak AI | `/ai/` |
 | Authelia | `/auth/` |
 
-`/` redirects to `/ops/`. Paths are built into the application code; there are
+Unmatched paths (including `/`) redirect to `CATCH_ALL_REDIRECT_URL`, which
+defaults to `/ops/`. Use a path to preserve the current hostname/IP and port,
+or an absolute URL to redirect elsewhere. The fallback router has priority `1`,
+so application and auth routes take precedence. App-generated 404 responses
+are not redirected. Choose a destination handled by an existing route to avoid
+a redirect loop. After changing `.env`, run `docker compose up -d traefik`
+to apply it. Redirects are temporary (302).
+
+Application paths are built into the application code; there are
 no path environment variables, hostname-based application routers, or path
 Compose overrides. Rebuild application images after upgrading from root-path
 builds.

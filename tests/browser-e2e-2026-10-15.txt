@@ -1,0 +1,163 @@
+HABAK REAL-BROWSER END-TO-END TEST — 2026-10-15
+
+Environment and method
+Real desktop Chrome on ori-lp, attached through Playwright CLI/CDP; no headless
+substitute, mocked API, or direct database seeding. All application data creation
+and mutations used actual UI controls. Two read-only fetches inside the browser
+additionally verified server-side 403 responses. Source inspection and independent
+PDF tools were used to explain findings, not as substitutes for UI tests.
+Primary origin: https://192.168.50.218:8543
+Second origin: https://192.168.122.60:8543
+Accounts: admin followed by volunteer; final additional admin checks on second IP.
+Test marker: E2E-1015. All contacts, equipment transactions, and procedures fictional.
+
+Result
+Main admin setup and volunteer operational workflows passed. The suite is not
+fully green: exports omit updates, contextual AI retrieval missed an answer, and
+one PDF fixture failed ingestion despite successful independent text extraction.
+No application code was changed during this testing task.
+
+Confirmed findings
+
+1. OPS EXPORT DATA LOSS — both CSV and PDF omit saved event updates.
+   Reproduction: create an event, add an update, close it, select Closed events,
+   export CSV/PDF. Event detail shows the update; both exports say no updates.
+   Test event ID prefix: 5adbcf72.
+   Evidence: artifacts/browser-e2e-2026-10-15/events.csv and events-export.png.
+   The screenshot volunteer-ops-complete.png shows the saved updates (a second
+   completion update was added after the original exports).
+   Source: ../midburn-ops-log/src/pages/Index.tsx:32 initializes eventUpdatesMap
+   to an empty object and passes it into EventsExplorer/ExportDialog. Both
+   exporters read this empty map. Files download and PDF renders, but data is lost.
+
+2. AI CONTEXTUAL RETRIEVAL LIMITATION — follow-up misses indexed information.
+   Uploaded E2E-1015-test-procedure.txt defines Purple Lantern / פנס סגול,
+   fictional code 7419, and completion steps. Explicit question about station/code
+   succeeds. Follow-up "ומה צריך לעשות בסיום הבדיקה הזאת?" returns the no-procedure
+   fallback. Explicitly naming E2E-1015-test-procedure.txt and Purple Lantern in
+   the next question succeeds and says to mark the test complete.
+   Conversation retained for reproduction. One observed case, not a statistical
+   evaluation of model quality. Answers named the document in prose; no clickable
+   source citation control was observed in these responses.
+
+3. PDF COMPATIBILITY EDGE CASE.
+   The small PDF preserved as artifacts/browser-e2e-2026-10-15/
+   E2E-1015-delete-test.pdf fails AI upload with HTTP 500 / "bad XRef entry".
+   Local pdfinfo reports a valid one-page PDF 1.4 without errors; pdftotext extracts
+   both lines correctly. A second PDF generated with jsPDF ingests successfully,
+   produces one chunk, and renders in Chrome's embedded PDF viewer.
+   Thus PDF ingestion works generally, but this fixture exposes parser tolerance
+   differences. Failed document is shown with a clear error in admin and excluded
+   from the library. Successful Markdown in the same batch remained available.
+   Failed record deleted via admin UI after recording evidence.
+
+Expected behavior and usability notes
+- Reopen is admin-only. Volunteer sees a Reopen button but receives the explicit
+  "only an administrator can reopen a closed event" notification. Admin reopen
+  succeeds. Initial apparent no-op was this restriction, not an update failure.
+- Talkies over-allocation is intentionally informational. A third radio could be
+  issued against a daily allocation of two. This matches the existing design:
+  ../burn-talkies/docs/superpowers/specs/2026-08-22-postgresql-proxy-auth-design.md
+  lines 141-142. All three radios were returned individually afterward.
+- AI conversation history is shared across users. Volunteer can see previously
+  existing admin conversation titles. The list and delete implementations describe
+  shared conversations; this is not per-user private history. This run deleted
+  only its own disposable conversation, not another user's conversation.
+- AI and Talkies top links still target the LAN origin with absolute URLs, even
+  when browsing the private IP. App routes and session domains work on both IPs,
+  but these links switch origins (and therefore may switch authenticated accounts).
+- Test certificates are self-signed. Chrome required accepting the known private-IP
+  certificate on first use; certificate trust was not silently disabled globally.
+
+Executed coverage
+
+Authentication / routing
+PASS Admin real login on LAN origin.
+PASS Session carries between Ops, Talkies, and AI without additional login.
+PASS Ops logout invalidates access in the other AI tab after reload.
+PASS Volunteer login and correct role-specific controls.
+PASS Private-IP admin login while LAN volunteer session remains independent.
+PASS Fixed path navigation, deep pages, query-string tabs, and browser reloads.
+PASS Ops relative links to AI and Talkies.
+PASS Volunteer direct Ops ?tab=admin redirects to the allowed new-event tab.
+PASS Volunteer direct Talkies /admin and /talkies/allocations show Access denied.
+PASS Volunteer direct AI /admin/documents redirects to chat.
+PASS Browser GET /ai/api/documents and /ops/api/subjects?include_archived=true
+     both return HTTP 403 for volunteer.
+
+Ops admin setup and lifecycle
+PASS Create announcement, edit, archive, restore; visible to volunteer.
+PASS Create report receiver and reporter, rename receiver, archive and restore it.
+PASS Admin reopen of the volunteer's closed event.
+PASS Admin edit priority from high to low, append completion update, close again.
+PASS Archive temporary announcement at end.
+
+Ops volunteer operations
+PASS Required-field validation rejects blank event with visible error.
+PASS Select admin-created receiver/reporter, enter contact/content/priority, save.
+PASS New event appears in list with correct contact and priority.
+PASS Search by E2E-1015 and open/closed filtering.
+PASS Add update, observe it in card and table detail, persist across reload.
+PASS Close event; it disappears from open filter and appears under closed.
+PASS Card/table switching and detail dialog.
+PASS Statistics show two events total: one prior open fixture and our closed event.
+PASS Embedded AI receives event content and updates and answers with test code.
+PASS CSV and PDF generation/download; FAIL update contents (finding 1).
+PASS Volunteer reopening denied with explanation; admin-only edit/delete hidden.
+
+Talkies admin setup
+PASS Create E2E-1015 Test Department with default radio=3 and mule=2 allocations.
+PASS Create 3 radios, 2 mules, 2 payment terminals, 2 decibel meters.
+PASS Change today's radio budget to 2 and add note; reload preserves both.
+
+Talkies volunteer operations
+PASS Checkout radios 1, 2, 3; borrower and department appear in return selector.
+PASS Inventory refreshes to 3 in use; assignment audit logs created.
+PASS Return radios individually; final 3 available / 0 in use.
+PASS Mule checkout and return, borrower and department audit records.
+PASS Mule charging -> available, damaged with note -> available, lost with note
+     -> available. Daily report records the transitions and department usage.
+PASS Terminal checkout and return; final 2 available / 0 in use.
+PASS Meter checkout and return; final 2 available / 0 in use.
+PASS Register fictional found item; confirm release; report shows 0 retained,
+     1 released with registration/release timestamps.
+PASS Daily-report previous/next date navigation.
+PASS Admin navigation and inventory-add controls hidden from volunteer.
+
+AI admin / volunteer
+PASS TXT upload -> ready with one chunk; source preview displays full content.
+PASS Markdown ingestion in multi-file batch -> ready.
+PASS jsPDF-generated PDF ingestion -> ready and visual PDF preview.
+PASS Failed-PDF state visible; failed document excluded from library.
+PASS Delete temporary ready Markdown and failed PDF with confirmation.
+PASS Volunteer source-library access and full TXT preview.
+PASS Standalone streamed answer returns unique fictional code 7419.
+PASS Ops-embedded answer returns the same code and marks content as test-only.
+FAIL Vague contextual follow-up; explicit-document follow-up succeeds (finding 2).
+PASS Conversation selection and full history after reload.
+PASS English/Hebrew UI switching.
+PASS New disposable chat and confirmed delete; absent after reload.
+
+Final state
+Ops event 5adbcf72 is closed, low priority, with volunteer and completion updates.
+Test announcement is archived. Receiver, reporter, department and inventory remain
+as labeled fixtures. Radio/mule/terminal/meter inventory is all available, with
+zero in-use, charging, lost, or damaged items. Fictional found item is released.
+TXT and working jsPDF test documents remain for review, alongside the pre-existing
+VM connectivity document. Temporary Markdown, failed-PDF record and disposable
+chat were deleted. Other conversations and original fixtures were preserved.
+Real browser left on LAN Ops as volunteer, showing the closed test event.
+
+Scope limits
+This is a broad desktop Chrome functional acceptance run, not proof that every
+possible input, browser, concurrency race, or load scenario works. Bulk delete-all
+and reset-all destructive admin actions were inspected but not executed. Password
+reset/email delivery, large-document limits, OCR/scanned PDFs, exhaustive advanced
+filter combinations, pagination across many pages, mobile layouts, and offline/
+recovery behavior were not exercised. No production records were used or restored.
+
+Artifacts
+Repository: tests/artifacts/browser-e2e-2026-10-15/
+Additional temporary browser snapshots and original downloaded PDF:
+/tmp/habak-browser-e2e/ (local agent environment).
+Original exports also saved by Chrome under /home/ori/Downloads on ori-lp.
