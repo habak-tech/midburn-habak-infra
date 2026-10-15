@@ -1,0 +1,12 @@
+# Copy to session.yml and list every supported login origin here.
+# Keep the complete cookies list in this file; do not split it across files.
+session:
+  cookies:
+    - domain: '192.0.2.10'
+      authelia_url: 'https://192.0.2.10:8543/auth'
+      default_redirection_url: 'https://192.0.2.10:8543/ops/'
+
+    # Additional hostname example (configure DNS and TLS for it):
+    # - domain: 'habak.example.com'
+    #   authelia_url: 'https://habak.example.com/auth'
+    #   default_redirection_url: 'https://habak.example.com/ops/'

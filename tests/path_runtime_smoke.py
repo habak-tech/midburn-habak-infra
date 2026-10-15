@@ -36,7 +36,6 @@ def smoke_test(repo, prefix, command):
         port = listener.getsockname()[1]
     env = {
         **os.environ,
-        "APP_BASE_PATH": prefix,
         "DATABASE_URL": "postgresql://build:build@127.0.0.1:1/build",
         "NODE_ENV": "production",
     }

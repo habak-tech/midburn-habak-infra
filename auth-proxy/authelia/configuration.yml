@@ -24,42 +24,22 @@ authentication_backend:
 access_control:
   default_policy: deny
   rules:
-    - domain:
-        - '{{ env "AUTH_HOSTNAME" }}'
-        - '{{ env "AUTH_IP" }}'
+    - domain_regex: '^.*$'
       policy: bypass
       resources:
-        - '^/auth(/.*)?$'
-    - domain:
-        - "*.{{ env "COOKIE_DOMAIN" }}"
-        - '{{ env "AUTH_IP" }}'
-      policy: bypass
-      resources:
-        - '^/_next/static/.*$'
-    - domain:
-        - "*.{{ env "COOKIE_DOMAIN" }}"
-        - '{{ env "AUTH_IP" }}'
-      policy: bypass
-      methods:
-        - OPTIONS
-    - domain:
-        - '{{ env "COOKIE_DOMAIN" }}'
-        - '*.{{ env "COOKIE_DOMAIN" }}'
-        - '{{ env "AUTH_IP" }}'
+        - '^/auth(/.*)?(\?.*)?$'
+    - domain_regex: '^.*$'
       subject:
         - "group:midburn-ops-user"
         - "group:midburn-ops-admin"
+      resources:
+        - '^/(ops|talkies|ai)(/.*)?(\?.*)?$'
       policy: one_factor
 
 session:
   expiration: 1M
   inactivity: 1M
   remember_me: 1M
-  cookies:
-    - domain: '{{ env "COOKIE_DOMAIN" }}'
-      authelia_url: '{{ env "AUTH_PORTAL_URL" }}'
-    - domain: '{{ env "AUTH_IP" }}'
-      authelia_url: 'https://{{ env "AUTH_IP" }}/auth'
 
 storage:
   local:

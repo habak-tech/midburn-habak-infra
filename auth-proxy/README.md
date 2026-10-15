@@ -1,197 +1,89 @@
-# Auth Proxy
+# Auth proxy
+
+All applications share one HTTPS origin and fixed paths:
+
+| Service | Path |
+| --- | --- |
+| Operations log | `/ops/` |
+| Burn Talkies | `/talkies/` |
+| Habak AI | `/ai/` |
+| Authelia | `/auth/` |
+
+`/` redirects to `/ops/`. Paths are built into the application code; there are
+no path environment variables, hostname-based application routers, or path
+Compose overrides. Rebuild application images after upgrading from root-path
+builds.
 
 ## Setup
 
-See authelia/secrets.md for instructions on generating secrets.
+Install Docker Engine with Compose. Keep `midburn-habak-infra`,
+`midburn-ops-log`, `burn-talkies`, and `midburn-habak-ai` in sibling directories.
 
-Copy users.yml.example to users.yml, generate password hash using `docker run -it --entrypoint authelia authelia/authelia crypto hash generate`
+1. Copy `.env.example` to `.env` for listener ports (defaults: HTTP 8181,
+   HTTPS 8543). Copy `authelia/session.yml.example` to `authelia/session.yml`.
+   Set its complete `session.cookies` list to the hosts/IPs clients will use,
+   with each origin's `/auth` login URL and `/ops/` default redirect URL.
+   The deployment-specific `session.yml` is gitignored. Authelia loads it after
+   the shared `configuration.yml`; keep cookie entries only in `session.yml`.
+2. Generate the three Authelia secrets as described in
+   [authelia/secrets.md](authelia/secrets.md). Copy
+   `authelia/users.yml.example` to `authelia/users.yml` and set a password hash.
+   Give users `midburn-ops-user` or `midburn-ops-admin` membership.
+3. Configure each application's database credentials from its example env file.
+   Build images from the updated source. Ops uses
+   `COMPOSE_FILE=compose.yaml:compose.prod.yaml`; Talkies uses
+   `COMPOSE_FILE=compose.production.yaml`; AI uses `compose.yaml`.
+4. Create the shared network and start the proxy:
 
-Copy .env.example to .env and edit the values as needed.
+   ```sh
+   docker network inspect midburn-habak-auth-proxy >/dev/null 2>&1 || \
+     docker network create midburn-habak-auth-proxy
+   docker compose up -d --wait
+   ```
 
-Set in /etc/hosts - on the server with 127.0.0.1 and on local machines with the server IP:
+5. Start each app with `docker compose up -d --wait` from its own directory
+   (`Habak AI Agent/` for AI). Migrations run before application startup.
 
-```
-127.0.0.1 auth.habak.midburn ops.habak.midburn ai.habak.midburn talkies.habak.midburn
-```
+Open `https://<your-host>:8543/ops/`. HTTPS is required for the session cookie.
+Traefik's default certificate is self-signed; accept it for local testing or
+configure a certificate trusted by clients for persistent deployments.
 
-Setup shared network:
+The proxy clears client-supplied identity headers before authentication.
+Authentication runs before stripping `/ops` or `/talkies`. AI and Authelia
+receive their original paths. Databases and production application ports are
+not published to the host.
 
-```
-docker network create midburn-habak-auth-proxy
-```
+Ops defaults to `/ai/embed` for embedded chat and `/auth/logout` for logout.
+Talkies and AI top-link settings accept absolute URLs; use the same HTTPS
+origin and fixed paths for cross-app links.
 
-Setup midburn ops log
+## Optional Cloudflare tunnel
 
-```
-cd ../midburn-ops-log
-cp .env.example .env
-# modify for production
-echo "
-APP_IMAGE=ghcr.io/habak-tech/midburn-ops-log:latest
-POSTGRES_IMAGE=ghcr.io/habak-tech/midburn-ops-log-postgres:latest
-" >> .env
-```
+Set `CLOUDFLARE_TUNNEL_TOKEN` and `COMPOSE_PROFILES=cloudflare`. Configure one
+public hostname pointing to `https://traefik:443`, with origin certificate
+verification disabled only when using Traefik's self-signed certificate.
+Add that hostname and its HTTPS URLs to `authelia/session.yml`, and set
+`HTTPS_PORT=443` so the HTTP redirect uses the public port. All application paths use the same tunnel hostname.
 
-Setup burn talkies
+## Verification
 
-```
-cd ../burn-talkies
-cp .env.example .env
-# modify for production - replace the secrets
-```
-
-setup habak ai
-
-```
-cd ../midburn-habak-ai/Habak\ AI\ Agent/
-cp .env.production.example .env
-# modify for production
-```
-
-## Running
-
-```
-cd ../midburn-ops-log
-docker compose up -d
-
-cd ../burn-talkies
-docker compose up -d
-
-cd ../midburn-habak-ai/Habak\ AI\ Agent/
-docker compose up -d
-
-cd ../midburn-habak-infra/auth-proxy
-docker compose up -d
-```
-
-Login:
-
-```
-https://ops.habak.midburn
-```
-
-## Cloudflare Tunnel
-
-The optional `cloudflare` profile runs a remotely managed Cloudflare Tunnel.
-Create the tunnel in Cloudflare Zero Trust, then configure public hostnames for
-the Authelia portal and protected application. Set each hostname's service to
-`https://traefik:443` and enable **No TLS Verify** in its origin settings because
-Traefik uses its internal default certificate on the Docker network.
-
-Set the public hostnames and tunnel token in `.env`:
-
-```env
-AUTH_HOSTNAME=auth.example.org
-APP_HOSTNAME=ops.example.org
-COOKIE_DOMAIN=example.org
-AUTH_PORTAL_URL=https://auth.example.org
-CLOUDFLARE_TUNNEL_TOKEN=replace-with-the-tunnel-token
-```
-
-The protected application's Traefik router must use the same `APP_HOSTNAME`.
-The application has a separate `.env`, so in
-`../midburn-ops-log/compose.prod.yaml` replace its router rule with:
-
-```yaml
-- traefik.http.routers.midburn-ops-log.rule=Host(`${APP_HOSTNAME:-ops.habak.midburn}`)
-```
-
-Then set the same public hostname in `../midburn-ops-log/.env`:
-
-```env
-APP_HOSTNAME=ops.example.org
-```
-
-Treat the tunnel token as a secret; `.env` is excluded from Git. Users with
-access to the Docker daemon can inspect container environment variables and
-therefore access the token.
-
-Add to .env:
-
-```
-COMPOSE_PROFILES=cloudflare
-```
-
-Start the proxy normally
-
-## Shared IP / path routing
-
-Path mode serves all three apps and the login portal from one
-HTTPS origin, without DNS or `/etc/hosts` entries:
-
-| Component | Example URL |
-| --- | --- |
-| Operations log | `https://192.0.2.10:8543/ops/` |
-| Burn Talkies | `https://192.0.2.10:8543/talkies/` |
-| Habak AI | `https://192.0.2.10:8543/ai/` |
-| Authelia login | `https://192.0.2.10:8543/auth/` |
-
-Replace `192.0.2.10` with the server IP. In this directory's `.env`, keep the
-existing port and secret configuration and add:
-
-```env
-PUBLIC_HOST=192.0.2.10
-```
-
-The override sets Authelia's public host and cookie scope to `PUBLIC_HOST`, its
-server path to `/auth`, and its portal URL to
-`https://PUBLIC_HOST:HTTPS_PORT/auth`. The portal bypass rule applies only to
-`/auth` and its descendants; protected apps on the same IP still require a
-user in `midburn-ops-user` or `midburn-ops-admin`. HTTPS is required for the
-session cookie. Use a certificate trusted by your clients with an IP SAN for
-this IP; Traefik's default self-signed certificate is suitable only for manual
-testing after accepting the browser certificate prompt.
-
-Create the shared network if it does not already exist, then start the proxy:
-
-```sh
-docker network inspect midburn-habak-auth-proxy >/dev/null 2>&1 || \
-  docker network create midburn-habak-auth-proxy
-docker compose up -d --wait
-```
-
-From each application directory, build `web` (Talkies) or `app` (Ops/AI), then
-run `docker compose up -d --wait`. Keep existing database and migration images;
-only the application browser bundles require prefix-specific builds. The Ops
-production override still uses its configured PostgreSQL image.
-
-Traefik routes match the exact IP/host and either the prefix itself or the
-prefix followed by `/`; `/ops-other` cannot match `/ops`. Authentication runs
-before prefix stripping for Ops and Talkies. AI and Authelia receive the
-original prefixed URL and serve their own subpaths. Container health checks
-remain internal, with the AI check explicitly using its Next.js base path.
-
-For cross-app navigation, configure link destinations explicitly. In Ops use
-`AI_URL=https://192.0.2.10:8543/ai/embed` and
-`LOGOUT_URL=https://192.0.2.10:8543/auth/logout`; keep the same port as the proxy.
-
-Smoke-check login, a deep-link reload, browser assets, API calls, Talkies SSE,
-and the Ops AI iframe on the target host. To return to domain/root-path mode,
-remove `compose.path.yaml` from `COMPOSE_FILE`, clear `APP_BASE_PATH`, select the
-normal image tags, and rebuild any locally built root-path application images.
-
-### Validate changes locally
-
-From `midburn-habak-infra`, validate merged Compose configuration without
-starting the production stacks:
+From the infrastructure repository:
 
 ```sh
 python3 tests/test_path_routing.py
 ```
 
-After installing each app's dependencies and building Talkies with
-`APP_BASE_PATH=/talkies`, Ops with `APP_BASE_PATH=/ops`, and AI with
-`APP_BASE_PATH=/ai` (plus its documented build database URL), run:
+After building the sibling applications, run `python3 tests/path_runtime_smoke.py`
+for prefixed pages, assets, deep links, and AI authorization checks. On the
+running deployment also verify login, database APIs, Talkies SSE, the Ops AI
+iframe, and logout. Configuration checks alone do not exercise those flows.
+
+After editing session origins, validate both files and restart Authelia:
 
 ```sh
-python3 tests/path_runtime_smoke.py
+docker compose exec authelia authelia validate-config --config /config/configuration.yml --config /config/session.yml
+docker compose restart authelia
 ```
 
-The smoke script uses temporary loopback ports and stops all its application
-processes. It checks prefixed pages, JS/CSS assets, Vite deep links, and AI
-anonymous/admin authorization boundaries and redirects. It does not contact
-model providers or use a real database, and does not replace target-host
-login/API/SSE acceptance checks.
-
-The prefix build requirement follows [Next.js basePath behavior](https://nextjs.org/docs/pages/api-reference/config/next-config-js/basePath).
-Authelia's portal subpath uses its [server address setting](https://www.authelia.com/configuration/miscellaneous/server/).
+Each origin needs network access and a matching TLS certificate. Unrelated
+hosts/IPs have separate login sessions. App routing remains path-based.
