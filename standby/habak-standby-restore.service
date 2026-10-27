@@ -1,0 +1,20 @@
+[Unit]
+Description=Start Habak standby with optional one-boot restore
+Wants=network-online.target
+Requires=docker.service
+After=network-online.target docker.service
+StartLimitIntervalSec=0
+
+[Service]
+Type=oneshot
+ExecStart=/usr/bin/python3 /usr/local/lib/habak/restore_latest.py
+ExecStop=/usr/bin/python3 /usr/local/lib/habak/compose_guard.py --protect-existing
+RemainAfterExit=yes
+Restart=on-failure
+RestartSec=60
+TimeoutStartSec=45min
+UMask=0077
+Environment=CLOUDSDK_CORE_DISABLE_PROMPTS=1
+
+[Install]
+WantedBy=multi-user.target

@@ -69,15 +69,29 @@ if args[:2] == ["volume", "inspect"]:
     print(os.environ["UPLOADS"])
 if "run" in args and os.environ.get("FAIL_RESTORE"):
     sys.exit(42)
+if "pull" in args and os.environ.get("FAIL_PULL"):
+    sys.exit(43)
+if "config" in args and "--format" in args:
+    print(json.dumps({"services":{"app":{"restart":"unless-stopped"},"db":{"restart":"unless-stopped"},"postgres":{"restart":"unless-stopped"},"migrate":{"restart":"no"}}}))
+if "config" in args and "--environment" in args:
+    print("COMPOSE_FILE=compose.yaml")
 ''')
         self.env = dict(os.environ, PATH=f"{self.bin}:{os.environ['PATH']}",
-                        DOCKER_LOG=str(self.log), UPLOADS=str(self.uploads))
+                        DOCKER_LOG=str(self.log), UPLOADS=str(self.uploads),
+                        HABAK_HOME_RESTORE_SCRIPT=str(SCRIPT.parent / "standby/restore_home.py"))
         source = SCRIPT.read_text().replace("/home/habak", str(self.home))
         source = source.replace("/tmp/habak1-", str(self.root / "habak1-"))
         source = source.replace("/etc/cron.d/habak-backup", str(self.cron_file))
         self.script = self.root / "restore.sh"
         self.script.write_text(source)
         self.make_backup()
+        for project in ("burn-talkies", "midburn-habak-ai/Habak AI Agent",
+                        "midburn-ops-log", "midburn-habak-infra/auth-proxy"):
+            directory = self.home / project
+            directory.mkdir(parents=True)
+            (directory / "compose.yaml").write_text("existing config\n")
+        (self.home / ".ssh").mkdir()
+        (self.home / ".ssh/config").write_text("existing ssh config\n")
 
     def command(self, name, source):
         path = self.bin / name
@@ -113,7 +127,7 @@ if "run" in args and os.environ.get("FAIL_RESTORE"):
     def calls(self):
         return [json.loads(line) for line in self.log.read_text().splitlines()] if self.log.exists() else []
 
-    def test_restores_files_uploads_and_all_dumps_before_starting_apps(self):
+    def test_restores_uploads_all_dumps_and_home_files(self):
         result = self.run_restore()
         self.assertEqual(result.returncode, 0, result.stdout + result.stderr)
         self.assertFalse(self.cron_file.exists())
@@ -121,6 +135,7 @@ if "run" in args and os.environ.get("FAIL_RESTORE"):
                          "* * * * * root backup-script cron\n")
         self.assertTrue((self.home / ".ssh/config").exists())
         self.assertEqual((self.home / ".ssh/config").read_text(), "restored ssh config\n")
+        self.assertEqual((self.home / "burn-talkies/compose.yaml").read_text(), "services: {}\n")
         self.assertEqual(self.home.stat().st_mode & 0o777, 0o750)
         self.assertEqual((self.uploads / "document.txt").read_text(), "saved upload")
         self.assertFalse((self.uploads / "stale.txt").exists())
@@ -148,22 +163,79 @@ if "run" in args and os.environ.get("FAIL_RESTORE"):
         self.assertNotEqual(self.run_restore(TEST_UID="1000").returncode, 0)
         self.assertEqual(self.calls(), [])
 
-    @unittest.skipUnless(os.geteuid() == 0, "numeric ownership requires root")
-    def test_home_files_belong_to_recovery_user_when_backup_uid_differs(self):
-        home_archive = self.backup / "home.tar.gz"
-        with tarfile.open(home_archive) as original:
-            entries = [(entry, original.extractfile(entry).read()) for entry in original]
-        with tarfile.open(home_archive, "w:gz") as changed:
-            for entry, content in entries:
-                entry.uid = entry.gid = 12345
-                entry.uname = entry.gname = "original-habak"
-                changed.addfile(entry, io.BytesIO(content))
-        self.pack()
+    def test_missing_corrupt_or_unsafe_home_payload_aborts_before_stopping_services(self):
+        for mode in ("missing", "corrupt", "unexpected-path"):
+            with self.subTest(mode=mode):
+                self.make_backup()
+                target = self.backup / "home.tar.gz"
+                if mode == "missing":
+                    target.unlink()
+                elif mode == "corrupt":
+                    target.write_bytes(b"not a gzip archive")
+                else:
+                    archive(target, {"etc/passwd": b"must not be extracted"})
+                self.pack()
+                result = self.run_restore()
+                self.assertNotEqual(result.returncode, 0)
+                self.assertEqual(self.calls(), [])
+                self.assertEqual((self.home / ".ssh/config").read_text(), "existing ssh config\n")
+
+    def test_missing_installed_project_is_created_from_backup(self):
+        shutil.rmtree(self.home / "burn-talkies")
         result = self.run_restore()
         self.assertEqual(result.returncode, 0, result.stdout + result.stderr)
-        for path in self.home.rglob("*"):
-            self.assertEqual(path.stat().st_uid, self.home.stat().st_uid, str(path))
-            self.assertEqual(path.stat().st_gid, self.home.stat().st_gid, str(path))
+        self.assertEqual((self.home / "burn-talkies/compose.yaml").read_text(), "services: {}\n")
+
+    def test_installed_app_root_override(self):
+        app_root = self.root / "installed-apps"
+        app_root.mkdir()
+        for name in ("burn-talkies", "midburn-habak-ai", "midburn-ops-log", "midburn-habak-infra"):
+            shutil.move(str(self.home / name), app_root / name)
+        result = self.run_restore(HABAK_RESTORE_APP_ROOT=str(app_root))
+        self.assertEqual(result.returncode, 0, result.stdout + result.stderr)
+        for call in self.calls():
+            if call["args"][0] == "compose" and not any(arg in call["args"] for arg in ("config", "pull")):
+                self.assertTrue(call["cwd"].startswith(str(app_root) + "/"))
+
+    def test_overlay_is_applied_before_compose_validation_and_survives_restore(self):
+        overlay = self.home / ".overwrite-after-restore/midburn-habak-infra/auth-proxy"
+        overlay.mkdir(parents=True)
+        (overlay / "compose.yaml").write_text("local compose override\n")
+        nested = overlay / "authelia/secrets/SESSION_SECRET"
+        nested.parent.mkdir(parents=True)
+        nested.write_text("local-secret")
+        result = self.run_restore()
+        self.assertEqual(result.returncode, 0, result.stdout + result.stderr)
+        self.assertEqual((self.home / "midburn-habak-infra/auth-proxy/compose.yaml").read_text(), "local compose override\n")
+        self.assertEqual((self.home / "midburn-habak-infra/auth-proxy/authelia/secrets/SESSION_SECRET").read_text(), "local-secret")
+        self.assertEqual(nested.read_text(), "local-secret")
+
+    def test_image_pull_failure_preserves_home_files_and_running_deployment(self):
+        result = self.run_restore(FAIL_PULL="1")
+        self.assertNotEqual(result.returncode, 0)
+        self.assertEqual((self.home / "burn-talkies/compose.yaml").read_text(), "existing config\n")
+        self.assertEqual((self.uploads / "stale.txt").read_text(), "old")
+        self.assertFalse(any("down" in call["args"] or "run" in call["args"] for call in self.calls()))
+
+    def test_standby_restore_uses_boot_guard_and_finishes_data_restore_before_starting_apps(self):
+        result = self.run_restore(HABAK_COMPOSE_WRAPPER=str(SCRIPT.parent / "standby/compose_guard.py"),
+            HABAK_COMPOSE_GUARD_DIR=str(self.root / "guard"))
+        self.assertEqual(result.returncode, 0, result.stdout + result.stderr)
+        calls = self.calls()
+        restores = [i for i, call in enumerate(calls) if "run" in call["args"]]
+        starts = [i for i, call in enumerate(calls) if "up" in call["args"]]
+        self.assertEqual(len(restores), 3)
+        self.assertEqual(len(starts), 4)
+        self.assertLess(max(restores), min(starts))
+        for path in (self.root / "guard").glob("*.json"):
+            config = json.loads(path.read_text())
+            self.assertTrue(all(service["restart"] == "on-failure:5" for service in config["services"].values()))
+
+    def test_failed_standby_data_restore_never_starts_apps_or_proxy(self):
+        result = self.run_restore(HABAK_COMPOSE_WRAPPER=str(SCRIPT.parent / "standby/compose_guard.py"),
+            HABAK_COMPOSE_GUARD_DIR=str(self.root / "guard"), FAIL_RESTORE="1")
+        self.assertNotEqual(result.returncode, 0)
+        self.assertFalse(any("up" in call["args"] for call in self.calls()))
 
     def test_restore_on_explicit_recovery_host(self):
         self.command("hostname", "#!/bin/sh\necho ori-laptop\n")
@@ -185,6 +257,13 @@ if "run" in args and os.environ.get("FAIL_RESTORE"):
         self.bundle.unlink()
         self.assertNotEqual(self.run_restore().returncode, 0)
         self.assertEqual(self.calls(), [])
+
+    def test_explicit_backup_file(self):
+        backup_file = self.root / "downloaded-backup.tar.gz"
+        self.bundle.rename(backup_file)
+        result = self.run_restore(HABAK_BACKUP_FILE=str(backup_file))
+        self.assertEqual(result.returncode, 0, result.stdout + result.stderr)
+        self.assertEqual((self.uploads / "document.txt").read_text(), "saved upload")
 
     def test_missing_or_corrupt_payload_is_rejected_before_stopping_services(self):
         for mode in ("missing", "corrupt"):
@@ -268,7 +347,7 @@ if "run" in args and os.environ.get("FAIL_RESTORE"):
     def test_existing_stacks_are_stopped_before_database_restore(self):
         for project in ("burn-talkies", "midburn-habak-ai/Habak AI Agent",
                         "midburn-ops-log", "midburn-habak-infra/auth-proxy"):
-            (self.home / project).mkdir(parents=True)
+            (self.home / project).mkdir(parents=True, exist_ok=True)
         result = self.run_restore()
         self.assertEqual(result.returncode, 0, result.stdout + result.stderr)
         calls = self.calls()
@@ -277,8 +356,7 @@ if "run" in args and os.environ.get("FAIL_RESTORE"):
         self.assertLess(max(stops), next(i for i, call in enumerate(calls) if "run" in call["args"]))
 
     def test_wrong_archive_paths_are_rejected_before_stopping_services(self):
-        for payload, path in (("home.tar.gz", "etc/passwd"),
-                              ("ai-uploads.tar.gz", "var/lib/docker/volumes/other/_data/file")):
+        for payload, path in (("ai-uploads.tar.gz", "var/lib/docker/volumes/other/_data/file"),):
             with self.subTest(payload=payload):
                 self.make_backup()
                 archive(self.backup / payload, {path: b"unexpected"})
@@ -326,7 +404,8 @@ if "run" in args:
     image = "postgres:17" if user == "burn_talkies_bootstrap" else "postgres:17-alpine"
     volume = os.environ["TEST_VOLUME_PREFIX"] + "-" + user
     command = [os.environ["REAL_DOCKER"], "run", "--rm", "-i", "--network", "none",
-               "--user", "postgres", "--entrypoint", "bash", "-v",
+               "--user", "postgres", "--entrypoint", "bash",
+               "-e", "POSTGRES_USER=" + user, "-e", "POSTGRES_PASSWORD=fixture-password", "-v",
                volume + ":/var/lib/postgresql/data", image] + args[args.index("-c"):]
     sys.exit(subprocess.run(command, input=payload, text=True).returncode)
 '''

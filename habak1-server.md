@@ -140,6 +140,27 @@ sudo systemctl restart cron
 sudo journalctl -u cron -f
 ```
 
+Setup wifi hotspot
+
+```
+sudo nmcli connection add \
+  type wifi \
+  ifname wlan0 \
+  con-name Pi-Setup \
+  ssid Pi-Setup \
+  wifi.mode ap \
+  wifi.band bg \
+  wifi-sec.key-mgmt wpa-psk \
+  ipv4.method shared \
+  ipv4.addresses 10.42.0.1/24 \
+  connection.autoconnect yes \
+  connection.autoconnect-priority -100
+
+read -rsp "Hotspot password: " AP_PSK; echo
+sudo nmcli connection modify Pi-Setup wifi-sec.psk "$AP_PSK"
+unset AP_PSK
+```
+
 ## Deploy
 
 Push changes to github, wait for the CI/CD pipeline to complete, then run deploy script on the habak1 server:

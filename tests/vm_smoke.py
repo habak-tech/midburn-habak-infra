@@ -2,7 +2,7 @@
 
 Run inside the test VM:
   python3 tests/vm_smoke.py --origin https://192.168.50.218:8543 \
-    --login-file /home/habak/apps/test-login.json \
+    --login-file /home/habak/test-login.json \
     --ca-file auth-proxy/tls/server.crt
 Credentials and session cookies are never printed.
 """
@@ -13,6 +13,7 @@ from pathlib import Path
 import re
 import ssl
 import urllib.error
+import urllib.parse
 import urllib.request
 
 
@@ -49,10 +50,11 @@ def main():
         status, headers, _ = request(anonymous, path, headers={'Accept': 'text/html', 'Remote-User': 'spoofed-admin', 'Remote-Groups': 'midburn-ops-admin'})
         assert status == 302 and '/auth/' in headers['Location'], (path, status)
     for path in ('/ops-other', '/talkies-other', '/ai-other', '/auth-other', '/api/session'):
-        assert request(anonymous, path)[0] == 404, path
+        status, headers, _ = request(anonymous, path)
+        assert status == 302 and urllib.parse.urljoin(origin + '/', headers['Location']) == origin + '/ops/', path
     status, headers, _ = request(anonymous, '/?from=smoke')
-    assert status in (301, 302, 307, 308) and headers['Location'] == origin + '/ops/?from=smoke'
-    print('Anonymous access, spoofed identity rejection, exact path boundaries, and root redirect passed')
+    assert status == 302 and urllib.parse.urljoin(origin + '/', headers['Location']) == origin + '/ops/'
+    print('Anonymous access, spoofed identity rejection, exact path boundaries, and fallback redirect passed')
 
     credentials = json.loads(args.login_file.read_text())
     status, _, _ = request(authenticated, '/auth/api/firstfactor', {**credentials, 'keepMeLoggedIn': False, 'targetURL': origin + '/ops/'})
