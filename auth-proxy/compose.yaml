@@ -1,10 +1,44 @@
 services:
+  tls-init:
+    image: alpine:3.23
+    restart: "no"
+    environment:
+      TLS_CERT_SAN: ${TLS_CERT_SAN:-DNS:localhost,IP:127.0.0.1}
+    entrypoint: /bin/sh
+    command:
+      - -ec
+      - |
+        umask 077
+        if [ ! -s /certs/server.crt ] || [ ! -s /certs/server.key ]; then
+          apk add --no-cache openssl
+          openssl req -x509 -nodes -newkey rsa:2048 -sha256 -days 365 \
+            -subj '/CN=Habak self-signed' \
+            -addext "subjectAltName=$$TLS_CERT_SAN" \
+            -keyout /certs/server.key.tmp -out /certs/server.crt.tmp
+          mv /certs/server.key.tmp /certs/server.key
+          mv /certs/server.crt.tmp /certs/server.crt
+        fi
+        cat > /certs/tls.yml <<'EOF'
+        tls:
+          stores:
+            default:
+              defaultCertificate:
+                certFile: /certs/server.crt
+                keyFile: /certs/server.key
+        EOF
+    volumes:
+      - traefik-certs:/certs
+
   traefik:
     image: traefik:v3.7
     restart: unless-stopped
+    depends_on:
+      tls-init:
+        condition: service_completed_successfully
     command:
       - --providers.docker=true
       - --providers.docker.exposedbydefault=false
+      - --providers.file.filename=/certs/tls.yml
       - --entrypoints.web.address=:80
       - --entrypoints.websecure.address=:443
       - --api.dashboard=false
@@ -15,6 +49,7 @@ services:
       - "${HTTPS_PORT:-8543}:443"
     volumes:
       - /var/run/docker.sock:/var/run/docker.sock:ro
+      - traefik-certs:/certs:ro
     labels:
       - traefik.enable=true
       - traefik.http.middlewares.authelia.chain.middlewares=clear-identity,authelia-verify
@@ -76,6 +111,9 @@ services:
       - traefik
     networks:
       - authproxy
+
+volumes:
+  traefik-certs:
 
 networks:
   authproxy:

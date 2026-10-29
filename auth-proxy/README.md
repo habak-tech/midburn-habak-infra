@@ -53,8 +53,23 @@ Install Docker Engine with Compose. Keep `midburn-habak-infra`,
    (`Habak AI Agent/` for AI). Migrations run before application startup.
 
 Open `https://<your-host>:8543/ops/`. HTTPS is required for the session cookie.
-Traefik's default certificate is self-signed; accept it for local testing or
-configure a certificate trusted by clients for persistent deployments.
+The one-off `tls-init` container generates a self-signed certificate in the
+`traefik-certs` named volume before Traefik starts. It installs OpenSSL from
+Alpine's package repository on first generation, which requires internet access.
+Traefik mounts the volume read-only and reuses the certificate across restarts,
+container recreation, and `docker compose down` / `up`. `docker compose down -v`
+deletes the certificate volume. Back up this volume separately when migrating
+hosts; the existing server backup script does not include it.
+
+Set `TLS_CERT_SAN` in `.env` to the DNS names/IPs clients use before the first
+start (for example `DNS:habak.local,IP:192.168.1.10`). It defaults to localhost.
+The certificate lasts one year and is not automatically renewed. Changing
+`TLS_CERT_SAN` does not replace an existing certificate. To regenerate it, stop
+Traefik, remove `server.crt` and `server.key` from this volume, then run
+`docker compose up -d traefik`. Clients must trust the replacement again.
+Accept the self-signed certificate for local testing or configure a certificate
+trusted by clients for persistent deployments. Applying this setup replaces
+Traefik's previous in-memory certificate on the first deployment.
 
 The proxy clears client-supplied identity headers before authentication.
 Authentication runs before stripping `/ops` or `/talkies`. AI and Authelia
