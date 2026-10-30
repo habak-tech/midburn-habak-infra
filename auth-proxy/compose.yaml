@@ -79,6 +79,9 @@ services:
       - --config=/config/configuration.yml
       - --config=/config/session.yml
     restart: unless-stopped
+    depends_on:
+      session-redis:
+        condition: service_healthy
     volumes:
       - ./authelia:/config
       - ./authelia/secrets:/secrets:ro
@@ -89,12 +92,29 @@ services:
       AUTHELIA_STORAGE_ENCRYPTION_KEY_FILE: /secrets/STORAGE_ENCRYPTION_KEY
     networks:
       - authproxy
+      - sessions
     labels:
       - traefik.enable=true
       - traefik.http.routers.authelia.rule=Path(`/auth`) || PathPrefix(`/auth/`)
+      - traefik.docker.network=midburn-habak-auth-proxy
       - traefik.http.routers.authelia.entrypoints=websecure
       - traefik.http.routers.authelia.tls=true
       - traefik.http.services.authelia.loadbalancer.server.port=9091
+
+  session-redis:
+    image: redis:7.4-alpine
+    restart: unless-stopped
+    command: [redis-server, --appendonly, "yes", --appendfsync, always]
+    volumes:
+      - authelia-sessions:/data
+    networks:
+      - sessions
+    healthcheck:
+      test: [CMD, redis-cli, ping]
+      interval: 5s
+      timeout: 3s
+      retries: 10
+      start_period: 5s
 
   cloudflared:
     image: cloudflare/cloudflared:2026.8.2
@@ -114,8 +134,11 @@ services:
 
 volumes:
   traefik-certs:
+  authelia-sessions:
 
 networks:
+  sessions:
+    internal: true
   authproxy:
     name: midburn-habak-auth-proxy
     external: true

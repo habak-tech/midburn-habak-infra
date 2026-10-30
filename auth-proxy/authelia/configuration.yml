@@ -37,9 +37,12 @@ access_control:
       policy: one_factor
 
 session:
-  expiration: 1M
-  inactivity: 1M
-  remember_me: 1M
+  expiration: 30d
+  inactivity: 30d
+  remember_me: 30d
+  redis:
+    host: session-redis
+    port: 6379
 
 storage:
   local:

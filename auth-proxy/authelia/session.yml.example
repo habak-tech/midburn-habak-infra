@@ -1,5 +1,7 @@
 # Copy to session.yml and list every supported login origin here.
 # Keep the complete cookies list in this file; do not split it across files.
+# Cookie entries inherit the shared 30-day expiration/inactivity/remember-me
+# timers. Avoid per-domain timer overrides unless deliberately changing them.
 session:
   cookies:
     - domain: '192.0.2.10'

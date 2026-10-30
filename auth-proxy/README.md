@@ -80,6 +80,65 @@ Ops defaults to `/ai/embed` for embedded chat and `/auth/logout` for logout.
 Talkies and AI top-link settings accept absolute URLs; use the same HTTPS
 origin and fixed paths for cross-app links.
 
+## Persistent logins
+
+Authelia's expiration, inactivity, and remember-me timers are all `30d`
+(2,592,000 seconds). Select **Remember me** when logging in to retain the
+cookie after closing the browser. Without it, server-side sessions still
+survive restarts, but the browser may discard its session cookie on exit.
+Logging out or clearing cookies ends access before the 30 days have elapsed.
+Deployment-specific `authelia/session.yml` entries inherit these timers;
+remove any shorter per-domain timer overrides when upgrading.
+
+Sessions are encrypted using the existing `SESSION_SECRET` and stored in
+`session-redis`. Redis persists them in the `authelia-sessions` named volume
+with append-only logging and `appendfsync always`, flushing writes before
+acknowledging them. This trades some write latency for durability across
+abrupt shutdowns. Redis has no published port and is attached only to the
+private, internal `sessions` network shared with Authelia. Both services
+restart automatically with Docker; Docker must be enabled at server boot.
+Authelia waits for Redis health during Compose startup.
+
+To upgrade an existing deployment, keep its `session.yml`, user database,
+and secrets, then run from `auth-proxy/`:
+
+```sh
+docker compose pull authelia session-redis
+docker compose run --rm --no-deps authelia authelia validate-config \
+  --config /config/configuration.yml --config /config/session.yml
+docker compose up -d --wait authelia session-redis
+```
+
+The switch from memory to Redis requires **one fresh login**. Subsequent
+Authelia/Redis container restarts, recreation, and server reboots retain
+sessions as long as the volume and session secret remain intact. Normal
+user and admin logins continue through Authelia; no automatic identity is
+injected.
+
+Do not use `docker compose down -v` when retaining logins: it deletes the
+session volume (and TLS volume). The existing server backup script does not
+archive this new named volume; recovery onto a different server requires
+fresh logins. This does not affect ordinary restarts on the same server.
+Rotating `SESSION_SECRET` also invalidates the stored sessions.
+
+To roll back, restore the previous Compose and Authelia configuration and
+recreate Authelia. Users must log in again with the in-memory provider.
+Leave the Redis volume intact until the rollback is confirmed.
+
+The isolated persistence check creates synthetic users/secrets and cleans
+up only its own containers and volumes:
+
+```sh
+python3 tests/session_persistence_smoke.py
+# If Docker runs outside this environment, use its reachable host address:
+python3 tests/session_persistence_smoke.py --host <docker-host-IP>
+```
+
+It checks concurrent sessions, actual 30-day Redis TTLs and remembered cookie
+expiry, Authelia restart, full container recreation, abrupt process termination,
+and logout isolation/persistence. It does not reboot the Docker host or run
+for 30 days.
+
 ## Optional Cloudflare tunnel
 
 Set `CLOUDFLARE_TUNNEL_TOKEN` and `COMPOSE_PROFILES=cloudflare`. Configure one

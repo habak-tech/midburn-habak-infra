@@ -41,11 +41,15 @@ class PathRoutingTests(unittest.TestCase):
                     self.assertIn("/ai/api/health", app["healthcheck"]["test"][-1])
 
     def test_portal(self):
-        portal = config(ROOT / "auth-proxy", ["compose.yaml"], ".env.example")["services"]["authelia"]
+        stack = config(ROOT / "auth-proxy", ["compose.yaml"], ".env.example")
+        portal = stack["services"]["authelia"]
         self.assertNotIn("PUBLIC_HOST", portal["environment"])
         self.assertNotIn("PUBLIC_ORIGIN", portal["environment"])
         self.assertEqual(portal["command"], ["authelia", "--config=/config/configuration.yml", "--config=/config/session.yml"])
         self.assertEqual(portal["labels"]["traefik.http.routers.authelia.rule"], "Path(`/auth`) || PathPrefix(`/auth/`)")
+        # Authelia also joins the private Redis network. Traefik must choose
+        # the shared proxy network instead of an unreachable container IP.
+        self.assertEqual(portal["labels"].get("traefik.docker.network"), stack["networks"]["authproxy"]["name"])
 
     def test_auth_policy_matches_queries_without_sibling_prefixes(self):
         text = (ROOT / "auth-proxy/authelia/configuration.yml").read_text()
